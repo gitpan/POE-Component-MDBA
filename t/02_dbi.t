@@ -1,18 +1,23 @@
 use strict;
-use Test::More (tests => 3);
+use Test::More;
 use POE;
 BEGIN
 {
+    eval "require DBD::SQLite";
+    if ($@) {
+        plan(skip_all => "This test requires SQLite");
+    } else {
+        plan(tests => 3);
+    }
     use_ok("POE::Component::MDBA");
 }
 
+my $dbname = 't/02_dbi.db';
 my $alias = 'MDBATest';
 POE::Component::MDBA->spawn(
     alias        => $alias,
     backend_args => [
-        [ 'dbi:SQLite:dbname=t/02_dbi.db' ],
-        [ 'dbi:SQLite:dbname=t/02_dbi.db' ],
-        [ 'dbi:SQLite:dbname=t/02_dbi.db' ],
+        ([ "dbi:SQLite:dbname=$dbname" ]) x 3
     ]
 );
 
@@ -28,7 +33,6 @@ POE::Session->create(
         },
         query => sub {
             $_[KERNEL]->post($alias, 'execute', {
-                select => 'fetchrow_arrayref',
                 args => [
                     { sql => 'SELECT 1', select_method => 'fetchrow_arrayref' },
                     { sql => 'SELECT 2', select_method => 'fetchrow_arrayref' },
@@ -54,3 +58,8 @@ POE::Session->create(
 );
 
 POE::Kernel->run;
+
+END
+{
+    unlink $dbname;
+}

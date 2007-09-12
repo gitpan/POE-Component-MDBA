@@ -1,4 +1,4 @@
-# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA/Backend/DBI.pm 2541 2007-09-11T13:25:08.143151Z daisuke  $
+# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA/Backend/DBI.pm 2546 2007-09-12T02:39:02.026696Z daisuke  $
 #
 # Copyright (c) 2007 Daisuke Maki <daisuke@endeworks.jp>
 # All rights reserved.
@@ -94,7 +94,7 @@ POE::Component::MDBA methods:
 =item backend_args
 
 backend_args takes an arrayref of arrayrefs. Each arrayref contains the
-arguments to DBI-E<lt>connect(). 
+arguments to DBI-E<gt>connect(). 
 
   POE::Component::MDBA->spawn(
     backend_args => [
@@ -120,7 +120,7 @@ are allowed - see I<placeholders> below.
 
 =item placeholders
 
-This specifies the list of placeholders passed to $sth-E<lt>execute()
+This specifies the list of placeholders passed to $sth-E<gt>execute()
 
 =item select_method
 
@@ -153,7 +153,7 @@ The $result value is a hashref containing the following keys:
 
 =item rv
 
-The value returned by $sth-E<lt>execute().
+The value returned by $sth-E<gt>execute().
 
 =item rows
 
@@ -185,7 +185,7 @@ populated with the value of the error
 =head2 new
 
 Creates a new POE::Component::MDBA::Backend::DBI instance. Takes a list of
-arguments, which are directly passed to DBI-E<lt>connect()
+arguments, which are directly passed to DBI-E<gt>connect()
 
 =head2 dbh
 

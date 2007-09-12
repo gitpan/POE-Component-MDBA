@@ -1,5 +1,10 @@
 Changes
 =======
 
+0.01001 - Sep 12 2007
+  * Doc tweaks
+  * Add POE::Component::MDBA::Backend::DBIC to execute DBIx::Class queries
+    from MDBA.
+
 0.01000 - Sep 11 2007
   * Initial release. 

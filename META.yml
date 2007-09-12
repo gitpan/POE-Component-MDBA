@@ -1,4 +1,6 @@
 --- 
+abstract: Multi-Database Aggregation with POE
+author: Copyright (c) 2007 Daisuke Maki <daisuke@endeworks.jp>
 distribution_type: module
 generated_by: Module::Install version 0.67
 license: perl
@@ -12,8 +14,10 @@ no_index:
     - t
 requires: 
   Class::Accessor::Fast: 0
+  Class::Inspector: 0
   DBI: 0
   Data::Dumper: 0
   Digest::MD5: 0
   POE: 0
   POE::Component::Generic: 0
+version: 0.01001

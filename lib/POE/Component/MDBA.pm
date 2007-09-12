@@ -1,15 +1,16 @@
-# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA.pm 2541 2007-09-11T13:25:08.143151Z daisuke  $
+# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA.pm 2548 2007-09-12T02:46:41.055723Z daisuke  $
 #
 # Copyright (c) 2007 Daisuke Maki <daisuke@endeworks.jp>
 # All rights reserved.
 
 package POE::Component::MDBA;
 use strict;
+use Class::Inspector;
 use Digest::MD5  ();
 use Data::Dumper ();
 use POE qw(Component::Generic);
 use vars qw($VERSION);
-$VERSION = '0.01000';
+$VERSION = '0.01001';
 
 sub spawn
 {
@@ -22,8 +23,10 @@ sub spawn
         $backend = "POE::Component::MDBA::Backend::$backend";
     }
 
-    eval "require $backend";
-    die if $@;
+    if (! Class::Inspector->loaded($backend) ) {
+        eval "require $backend";
+        die if $@;
+    }
 
     my @backends;
     foreach my $args (@{ $args{backend_args} }) {
@@ -222,6 +225,53 @@ will handle most of the simple cases for you.
 Please see L<POE::Component::MDBA::Backend::DBI> for the details on how to
 send these queries.
 
+=head1 CUSTOMIZATION
+
+If you need to customize the way queries are handled, or perhaps you need to
+change the way the results are being passed, create a custom backend.
+
+For example, if you want to serialize the results from each DBI backend
+to a file (so to keep the amount of memory being used at once), then you
+might want to do something like
+
+  package My::Backend::DBI;
+  use strict;
+  use base qw(POE::Component::MDBA::Backend::DBI);
+  use Path::Class::File;
+  use Storable qw(nstore_fd);
+
+  sub execute {
+    ... snip ...
+
+    my $path = Path::Class::File->new('/path/to/tempfile');
+    my $fh   = $path->openw;
+
+    ... snip ...
+    
+    if (my $select_method = $args->{select_method}) {
+        while( my $row = $sth->$select_method ) {
+          nstore_fd( $row, $fh );
+        }
+    }
+
+    ... snip ...
+
+    return $path;
+  }
+
+  # in your main code
+
+  use POE qw(Component::MDBA);
+  use My::Backend::DBI;
+
+  POE::Component::MDBA->spawn(
+    backend => '+My::Backend::DBI',
+    ...
+  );
+
+If you do this, yourr aggregate callback will receive a path name, which
+then you can combine to your liking.
+
 =head1 METHODS
 
 =head2 spawn %args
@@ -247,13 +297,84 @@ The actual argument format depends on each backend.
 
 =back
 
+=head1 STATES
+
+=head2 execute
+
+Executes the given query. There are three common parameters that are required
+for all types of backends, bu other than those, exactly what kind of arguments 
+are accepted depends on the backend being used.
+
+Here are the list of common parameters:
+
+=over 4
+
+=item args
+
+The I<args> argument is always an arrayref of arguments that will be sent
+to each backend's execute() method. Note that currently if you specify more 
+I<args> than there are backends, POE::Component::MDBA will simply dispatch 
+exceed queries to the same backends in a round robin manner.
+
+For example (for DBI backend):
+
+  POE::Kernel->post($alias, 'execute', {
+    args => [
+      { sql => $sql, placeholders => \@list },
+      { sql => $sql, placeholders => \@list },
+      { sql => $sql, placeholders => \@list },
+      ...
+    ],
+    ...
+  });
+
+=item aggregate
+
+The function to be called when I<each> query finishes. You may specify whatever
+kind of callback here, so it's quite possible to use postabcks from another
+session.
+
+The function will receive two arguments. These arguments are exactly the same
+as POE::Component::Generic's arguments that get passed back. 
+
+  sub aggregate
+  {
+    my($ref, $result) = @_;
+    ...
+  }
+
+Note that if you're using postbacks, you need to access them via ARG1
+
+  sub aggregate
+  {
+    my($req_pack, $res_pack) = @_[ARG0, ARG1];
+    my ($ref, $result) = @$res_pack;
+    ...
+  }
+
+=item finalize
+
+The function to be called after all queries have been returned (whether
+as it succeeded or not). 
+
+The arguments received are the same as that of I<aggregate>. Same caveats
+apply.
+
+=back
+
+=head1 CAVEATS
+
+Don't think about passing GLOB or CODE to execute. POE::Component::Generic
+serializes this data to pass it to the underlying backend, and the serialization
+of these types don't exactly make sense. (It will usually end up in an error)
+
 =head1 AUTHOR
 
 Copyright (c) 2007 Daisuke Maki E<lt>daisuke@endeworks.jpE<gt>
 
 =head1 SEE ALSO
 
-L<POE|POE> L<POE::Component::Generic|POE::Component::Generic> L<POE::Component::MDBA::Backend|POE::Component::MDBA::Backend> L<POE::Component::MDBA::Backend::DBI|POE::Component::MDBA::Backend::DBI>
+L<POE|POE> L<POE::Component::Generic|POE::Component::Generic> L<POE::Component::MDBA::Backend|POE::Component::MDBA::Backend> L<POE::Component::MDBA::Backend::DBI|POE::Component::MDBA::Backend::DBI> L<POE::Component::MDBA::Backend::DBIC|POE::Component::MDBA::Backend::DBIC>
 
 =head1 LICENSE
 
