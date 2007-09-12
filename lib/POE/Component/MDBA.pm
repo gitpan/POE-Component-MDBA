@@ -1,4 +1,4 @@
-# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA.pm 2548 2007-09-12T02:46:41.055723Z daisuke  $
+# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA.pm 2549 2007-09-12T08:39:16.012621Z daisuke  $
 #
 # Copyright (c) 2007 Daisuke Maki <daisuke@endeworks.jp>
 # All rights reserved.
@@ -10,7 +10,7 @@ use Digest::MD5  ();
 use Data::Dumper ();
 use POE qw(Component::Generic);
 use vars qw($VERSION);
-$VERSION = '0.01001';
+$VERSION = '0.01002';
 
 sub spawn
 {
@@ -19,6 +19,7 @@ sub spawn
 
     my $alias   = $args{alias} || 'MDBA';
     my $backend = $args{backend} || 'DBI';
+    my $debug   = $args{debug} || 0;
     if ($backend !~ s/^\+//) {
         $backend = "POE::Component::MDBA::Backend::$backend";
     }
@@ -31,9 +32,10 @@ sub spawn
     my @backends;
     foreach my $args (@{ $args{backend_args} }) {
         push @backends, POE::Component::Generic->spawn(
-            package => $backend,
+            debug          => $debug,
+            package        => $backend,
             object_options => $args,
-            methods => [ qw(execute) ],
+            methods        => [ qw(execute) ],
         );
     }
 
@@ -95,7 +97,8 @@ sub _evt_execute
     my %query_map     = (
         aggregate  => $args->{aggregate},
         finalize   => $args->{finalize},
-        dispatched => \%dispatched
+        dispatched => \%dispatched,
+        cookies    => $args->{cookies}
     );
 
     foreach my $sa (@$search_args) {
@@ -126,6 +129,8 @@ sub _evt_aggregate
     my $query_map = $heap->{active_queries}{ $ref->{query_id} };
     my $dispatch_map = $query_map->{dispatched};
     delete $dispatch_map->{ $ref->{id} };
+
+    $ref->{cookies} = $query_map->{cookies};
 
     if (my $fn = $query_map->{aggregate}) {
         $fn->($ref, $result);
@@ -295,6 +300,11 @@ arguments in this list.
 
 The actual argument format depends on each backend.
 
+=item debug
+
+Currently when this is set to a non-zero value, it will make 
+POE::Component::Generic spew out debug messages
+
 =back
 
 =head1 STATES
@@ -327,6 +337,15 @@ For example (for DBI backend):
     ],
     ...
   });
+
+=item cookies
+
+Sometimes you want to pass variables that you need to remember at the time
+results are being aggregated and/or finalized. This can be achieved by
+passing a "cookie".
+
+Cookies can be accessed via $ref->{cookies] in your aggregate / finalize
+functions.
 
 =item aggregate
 

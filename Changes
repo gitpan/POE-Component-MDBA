@@ -1,6 +1,10 @@
 Changes
 =======
 
+0.01002 - Sep 12 2007
+  * Allow debug option, which gets passed to PoCo::Generic
+  * Allow cookies to be sent to 'execute'
+
 0.01001 - Sep 12 2007
   * Doc tweaks
   * Add POE::Component::MDBA::Backend::DBIC to execute DBIx::Class queries
