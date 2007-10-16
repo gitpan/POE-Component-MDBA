@@ -1,6 +1,17 @@
 Changes
 =======
 
+0.01003 - Oct 16 2007
+  * Make sure that queries that couldn't be mapped to a backend don't
+    get lost. PoCo::Generic doesn't seem to handle multiple calls to
+    the same event before returning a response.
+  * Add tests for the above
+  * Add timeout options which will (attempt to) cancel calls in the backend
+    after the timeout has passed
+  * Allow alt_fork option, which gets passed to PoCo::Generic
+  * Actually store dbh in Backend::DBIC (doh!)
+  * Optionally commit the data in Backend::DBIC.
+
 0.01002 - Sep 12 2007
   * Allow debug option, which gets passed to PoCo::Generic
   * Allow cookies to be sent to 'execute'

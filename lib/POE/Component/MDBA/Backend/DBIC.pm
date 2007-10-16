@@ -1,4 +1,4 @@
-# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA/Backend/DBIC.pm 2545 2007-09-12T02:38:30.521360Z daisuke  $
+# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA/Backend/DBIC.pm 3522 2007-10-16T07:07:54.182447Z daisuke  $
 #
 # Copyright (c) 2007 Daisuke Maki <daisuke@endeworks.jp>
 # All rights reserved.
@@ -16,6 +16,7 @@ sub new
     my %args  = @_;
     my $schema = $args{schema};
     my $connect_info = $args{connect_info};
+    my $timeout = $args{timeout} || 30;
 
     if (! $schema) {
         die "No schema provided";
@@ -30,7 +31,7 @@ sub new
         $schema = $schema->connection(@$connect_info);
     }
 
-    $class->SUPER::new({ schema => $schema });
+    $class->SUPER::new({ schema => $schema, timeout => $timeout });
 }
 
 sub execute
@@ -58,15 +59,20 @@ sub search
     my $attrs   = $args->{attrs};
     my ($error, @rows);
     eval {
+        local $SIG{ALRM} = sub { die "__MDBA_DBIC_TIMEOUT__\n" };
+        alarm($self->timeout);
+
         my $rs = $schema->resultset($moniker)->search($where, $attrs);
         # There's no point in using this module unless we actually
         # fetch all the results!
         while (my $row = $rs->next) {
             push @rows, $row;
         }
+        alarm(0);
     };
-    if ($@) {
-        $error = $@;
+    alarm(0);
+    if ( $error = $@ ) {
+        eval { $schema->txn_rollback };
     }
 
     return +{

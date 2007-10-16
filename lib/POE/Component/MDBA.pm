@@ -1,4 +1,4 @@
-# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA.pm 2549 2007-09-12T08:39:16.012621Z daisuke  $
+# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA.pm 3526 2007-10-16T07:15:55.579562Z daisuke  $
 #
 # Copyright (c) 2007 Daisuke Maki <daisuke@endeworks.jp>
 # All rights reserved.
@@ -10,7 +10,7 @@ use Digest::MD5  ();
 use Data::Dumper ();
 use POE qw(Component::Generic);
 use vars qw($VERSION);
-$VERSION = '0.01002';
+$VERSION = '0.01003';
 
 sub spawn
 {
@@ -20,6 +20,7 @@ sub spawn
     my $alias   = $args{alias} || 'MDBA';
     my $backend = $args{backend} || 'DBI';
     my $debug   = $args{debug} || 0;
+    my $alt_fork = $args{alt_fork} || 0;
     if ($backend !~ s/^\+//) {
         $backend = "POE::Component::MDBA::Backend::$backend";
     }
@@ -32,10 +33,15 @@ sub spawn
     my @backends;
     foreach my $args (@{ $args{backend_args} }) {
         push @backends, POE::Component::Generic->spawn(
+            alt_fork       => $alt_fork,
             debug          => $debug,
             package        => $backend,
             object_options => $args,
             methods        => [ qw(execute) ],
+            error          => {
+                session => $alias,
+                event   => 'error'
+            }
         );
     }
 
@@ -49,7 +55,7 @@ sub spawn
         package_states => [
             $class => {
                 map { ($_ => "_evt_$_") }
-                    qw(_start _stop shutdown execute aggregate)
+                    qw(_start _stop shutdown execute aggregate dispatch_query)
             }
         ]
     );
@@ -94,37 +100,59 @@ sub _evt_execute
     my $search_args   = $args->{args};
     my $query_id      = _signature('_evt_execute', $args, $$, {}, time());
     my %dispatched    = ();
+    my %pending       = ();
     my %query_map     = (
         aggregate  => $args->{aggregate},
         finalize   => $args->{finalize},
         dispatched => \%dispatched,
-        cookies    => $args->{cookies}
+        cookies    => $args->{cookies},
+        pending    => \%pending,
     );
 
+    $heap->{active_queries}{ $query_id } = \%query_map;
     foreach my $sa (@$search_args) {
         my $idx     = $count++ % $backend_count;
         my $backend = $backends->[$idx];
         my $id      = join('.', $query_id, $count);
         my %cookie  = (
-            session  => $session->ID,
-            event    => 'aggregate',
-            query_id => $query_id,
-            id       => $id
+            session     => $session->ID,
+            event       => 'aggregate',
+            query_id    => $query_id,
+            id          => $id,
+            backend_idx => $idx,
+            timeout     => $args->{timeout}
         );
         my %opts    = (
             query_id => $query_id,
-            id       => $id
+            id       => $id,
         );
-        $dispatched{ $id }++;
-        $backend->execute(\%cookie, $sa, \%opts);
+        if ($count > $backend_count) {
+            $pending{ $idx } = [ \%cookie, $sa, \%opts ];
+        } else {
+            $kernel->call($_[SESSION], 'dispatch_query', $backend, \%cookie, $sa, \%opts);
+        }
     }
+}
 
-    $heap->{active_queries}{ $query_id } = \%query_map;
+sub _evt_dispatch_query
+{
+    my ($backend, $cookie, $sa, $opts, $heap) = @_[ARG0, ARG1, ARG2, ARG3, HEAP];
+
+    $heap->{active_queries}->{ $opts->{query_id} }->{dispatched}{ $opts->{id} }++;
+    my $rv = $backend->execute($cookie, $sa, $opts);
 }
 
 sub _evt_aggregate
 {
     my($kernel, $heap, $ref, $result) = @_[KERNEL, HEAP, ARG0, ARG1];
+    # Dispatch pending before aggregating
+
+    my $active = $heap->{active_queries};
+    my $query_data = $active->{ $ref->{query_id} };
+    my $pending = delete ($query_data->{pending}->{ $ref->{backend_idx} });
+    if ($pending) {
+        $kernel->call($_[SESSION], 'dispatch_query', $heap->{backends}->[ $ref->{backend_idx} ], @$pending);
+    }
 
     my $query_map = $heap->{active_queries}{ $ref->{query_id} };
     my $dispatch_map = $query_map->{dispatched};

@@ -1,4 +1,4 @@
-# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA/Backend/DBI.pm 2546 2007-09-12T02:39:02.026696Z daisuke  $
+# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA/Backend/DBI.pm 3525 2007-10-16T07:14:02.766695Z daisuke  $
 #
 # Copyright (c) 2007 Daisuke Maki <daisuke@endeworks.jp>
 # All rights reserved.
@@ -14,7 +14,19 @@ __PACKAGE__->mk_accessors($_) for qw(_dbh connect_info);
 sub new
 {
     my $class = shift;
-    $class->SUPER::new({ connect_info => [ @_ ] });
+
+    my $connect_info;
+    my $timeout;
+    if (ref($_[0]) eq 'HASH') {
+        my %args = @_;
+        $connect_info = $args{connect_info};
+        $timeout      = $args{timeout};
+    } else {
+        $connect_info = [ @_ ];
+    }
+
+    $timeout ||= 30;
+    $class->SUPER::new({ connect_info => $connect_info, timeout => $timeout});
 }
 
 sub dbh
@@ -23,6 +35,7 @@ sub dbh
     my $dbh = $self->_dbh;
     if (! $dbh || ! $dbh->ping) {
         $dbh = DBI->connect( @{ $self->connect_info } );
+        $self->_dbh($dbh);
     }
     return $dbh;
 }
@@ -32,8 +45,12 @@ sub execute
     my ($self, $args, $opts) = @_;
 
     my ($error, $rv, @rows);
+    my $dbh;
     eval { 
-        my $dbh = $self->dbh();
+        local $SIG{ALRM} = sub { die "__MDBA_DBI_TIMEOUT__\n" };
+        alarm($self->timeout);
+
+        $dbh = $self->dbh();
         my $sth = $dbh->prepare( $args->{sql} );
            $rv  = $sth->execute(@{ $args->{placeholders} });
         if (my $select_method = $args->{select_method}) {
@@ -41,10 +58,17 @@ sub execute
                 push @rows, $row;
             }
         }
+
+        if ($args->{commit}) {
+            $dbh->commit();
+        }
         $sth->finish; # just to make sure.
+        alarm(0);
     };
-    if ($@) {
-        $error = $@;
+    alarm(0);
+    if ($error = $@) {
+        # Make sure that the database handle is reset
+        eval { $dbh->rollback };
     }
 
     return +{

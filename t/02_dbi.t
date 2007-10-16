@@ -7,7 +7,7 @@ BEGIN
     if ($@) {
         plan(skip_all => "This test requires SQLite");
     } else {
-        plan(tests => 7);
+        plan(tests => 9);
     }
     use_ok("POE::Component::MDBA");
 }
@@ -37,6 +37,8 @@ POE::Session->create(
                     { sql => 'SELECT 1', select_method => 'fetchrow_arrayref' },
                     { sql => 'SELECT 2', select_method => 'fetchrow_arrayref' },
                     { sql => 'SELECT 3', select_method => 'fetchrow_arrayref' },
+                    { sql => 'SELECT 4', select_method => 'fetchrow_arrayref' },
+                    { sql => 'SELECT 5', select_method => 'fetchrow_arrayref' },
                 ],
                 cookies   => { cookie => 'monster' },
                 aggregate => $_[SESSION]->postback('aggregate'),
@@ -56,7 +58,7 @@ POE::Session->create(
             my ($ref, $result) = @$res_pack;
             ok(1, "finalize properly called");
             is($ref->{cookies}{cookie}, 'monster', 'cookies are in tact');
-            is_deeply($_[HEAP]->{results}, [ 1, 2, 3 ], "results are as expected");
+            is_deeply($_[HEAP]->{results}, [ 1, 2, 3, 4, 5 ], "results are as expected");
             $_[KERNEL]->post($alias, 'shutdown');
             $_[KERNEL]->yield('_stop');
         }

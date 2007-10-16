@@ -8,7 +8,7 @@ BEGIN
     if ($@) {
         plan(skip_all => "This test requires SQLite");
     } else {
-        plan(tests => 9);
+        plan(tests => 13);
     }
     use_ok("POE::Component::MDBA");
 }
@@ -28,6 +28,8 @@ EOSQL
 $dbh->do("INSERT INTO site (url, description) VALUES(?, ?)", undef, "http://www.perl.com", "perl.com");
 $dbh->do("INSERT INTO site (url, description) VALUES(?, ?)", undef, "http://search.cpan.org", "CPAN");
 $dbh->do("INSERT INTO site (url, description) VALUES(?, ?)", undef, "http://www.minico.jp", "minico");
+$dbh->do("INSERT INTO site (url, description) VALUES(?, ?)", undef, "http://www.endeworks.jp", "endeworks");
+$dbh->do("INSERT INTO site (url, description) VALUES(?, ?)", undef, "http://mt.endeworks.jp/d-6/", "blog");
 
 my $alias = 'MDBATest';
 POE::Component::MDBA->spawn(
@@ -54,6 +56,8 @@ POE::Session->create(
                     { moniker => 'Site', attrs => { rows => 1, limit => 1, page => 1 } },
                     { moniker => 'Site', attrs => { rows => 1, limit => 1, page => 2 } },
                     { moniker => 'Site', attrs => { rows => 1, limit => 1, page => 3 } },
+                    { moniker => 'Site', attrs => { rows => 1, limit => 1, page => 4 } },
+                    { moniker => 'Site', attrs => { rows => 1, limit => 1, page => 5 } },
                 ],
                 aggregate => $_[SESSION]->postback('aggregate'),
                 finalize => $_[SESSION]->postback('finalize')
@@ -70,10 +74,12 @@ POE::Session->create(
         finalize => sub {
             ok(1, "finalize properly called");
             my @results = @{ $_[HEAP]->{results} };
-            is(scalar @results, 3, "3 items returned");
-            is($results[0]->url, "http://search.cpan.org");
-            is($results[1]->url, "http://www.minico.jp");
-            is($results[2]->url, "http://www.perl.com");
+            is(scalar @results, 5, "3 items returned");
+            is($results[0]->url, "http://mt.endeworks.jp/d-6/");
+            is($results[1]->url, "http://search.cpan.org");
+            is($results[2]->url, "http://www.endeworks.jp");
+            is($results[3]->url, "http://www.minico.jp");
+            is($results[4]->url, "http://www.perl.com");
             $_[KERNEL]->post($alias, 'shutdown');
             $_[KERNEL]->yield('_stop');
         }

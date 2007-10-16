@@ -1,4 +1,4 @@
-# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA/Backend.pm 2541 2007-09-11T13:25:08.143151Z daisuke  $
+# $Id: /mirror/perl/POE-Component-MDBA/trunk/lib/POE/Component/MDBA/Backend.pm 3522 2007-10-16T07:07:54.182447Z daisuke  $
 #
 # Copyright (c) 2007 Daisuke Maki <daisuke@endeworks.jp>
 # All rights reserved.
@@ -6,6 +6,8 @@
 package POE::Component::MDBA::Backend;
 use strict;
 use base qw(Class::Accessor::Fast);
+
+__PACKAGE__->mk_accessors($_) for qw(timeout);
 
 1;
 
